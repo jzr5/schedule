@@ -1,0 +1,954 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>智能日历 · 连续带状</title>
+    <style>
+        /* ========== 全局重置 & 基础 ========== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: url('./bg.jpeg') no-repeat center center fixed;
+            background-size: cover;
+            background-color: #0f0c29;
+            padding: 24px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: -30%;
+            right: -20%;
+            width: 70%;
+            height: 70%;
+            background: radial-gradient(circle, rgba(120, 80, 255, 0.15) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        body::after {
+            content: '';
+            position: fixed;
+            bottom: -30%;
+            left: -20%;
+            width: 60%;
+            height: 60%;
+            background: radial-gradient(circle, rgba(255, 120, 200, 0.08) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ========== 主容器 ========== */
+        .container {
+            display: flex;
+            gap: 28px;
+            max-width: 1280px;
+            width: 100%;
+            min-height: 600px;
+            position: relative;
+            z-index: 1;
+            align-items: stretch;
+        }
+
+        /* ========== 液态玻璃卡片 ========== */
+        .glass {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(24px) saturate(1.2);
+            -webkit-backdrop-filter: blur(24px) saturate(1.2);
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            border-radius: 0;
+            transition: box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glass::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at 20% 20%, rgba(255, 255, 255, 0.06) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .glass::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .glass>* {
+            position: relative;
+            z-index: 2;
+        }
+
+        /* ========== 左侧：日历 ========== */
+        .calendar-section {
+            flex: 0 0 58%;
+            min-width: 420px;
+            display: flex;
+        }
+
+        .calendar-card {
+            flex: 1;
+            padding: 32px 30px 28px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .calendar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 22px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .calendar-header .month-year {
+            font-size: 22px;
+            font-weight: 600;
+            color: #f0eeff;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 12px rgba(100, 80, 255, 0.2);
+        }
+
+        .calendar-header .nav-btn {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #c8c4e6;
+            width: 38px;
+            height: 38px;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.25s ease;
+            user-select: none;
+        }
+
+        .calendar-header .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.14);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 24px rgba(120, 80, 255, 0.15);
+        }
+
+        .calendar-header .nav-btn:active {
+            transform: scale(0.94);
+        }
+
+        .calendar-header .nav-group {
+            display: flex;
+            gap: 6px;
+        }
+
+        /* ===== 星期行 ===== */
+        .weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 0;
+            margin-bottom: 4px;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .weekdays span {
+            text-align: center;
+            font-size: 13px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.45);
+            letter-spacing: 1px;
+            padding: 6px 0;
+            text-transform: uppercase;
+        }
+
+        /* ===== 日期网格 ===== */
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 0;
+            flex: 1;
+            margin-top: 2px;
+        }
+
+        .day-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: transparent;
+            border: none;
+            padding: 0;
+            min-height: 72px;
+            position: relative;
+        }
+
+        .day-cell.other-month {
+            opacity: 0.35;
+        }
+
+        .day-cell.today .day-number {
+            background: rgba(160, 130, 255, 0.25);
+            border-radius: 4px;
+            padding: 0 6px;
+            font-weight: 700;
+        }
+
+        .event-rows {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            flex: 1;
+            min-height: 44px;
+            width: 100%;
+            padding: 2px 0 1px 0;
+        }
+
+        .event-row {
+            height: 10px;
+            border-radius: 0;
+            background: rgba(255, 255, 255, 0.03);
+            font-size: 7px;
+            line-height: 10px;
+            padding: 0 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #1a103d;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            transition: background 0.2s;
+            width: 100%;
+        }
+
+        .event-row.type-holiday {
+            background: #fcd34d;
+            color: #1a103d;
+        }
+        .event-row.type-activity {
+            background: #60a5fa;
+            color: #fff;
+        }
+        .event-row.type-exam {
+            background: #f87171;
+            color: #fff;
+        }
+        .event-row.type-custom {
+            background: #a78bfa;
+            color: #fff;
+        }
+
+        .event-row.no-event {
+            background: transparent;
+        }
+
+        .day-number {
+            text-align: center;
+            font-size: 14px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 4px;
+            padding: 0 6px;
+            line-height: 1.8;
+            margin: 0 auto 2px auto;
+            display: inline-block;
+            position: relative;
+            z-index: 2;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+            pointer-events: none;
+            max-width: 80%;
+        }
+
+        .day-cell.other-month .day-number {
+            color: rgba(255, 255, 255, 0.3);
+            background: rgba(0, 0, 0, 0.25);
+        }
+
+        /* ========== 右侧区域 ========== */
+        .right-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+            min-width: 280px;
+        }
+
+        .right-card {
+            flex: 1;
+            padding: 28px 26px 24px;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .right-card .card-title {
+            font-size: 15px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.35);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .right-card .card-title .icon {
+            font-size: 18px;
+            opacity: 0.6;
+        }
+
+        .today-events {
+            flex: 1.2;
+        }
+
+        .today-events .event-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .today-events .event-item {
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border-left: 3px solid rgba(160, 130, 255, 0.4);
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 15px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+
+        .today-events .event-item .event-date-label {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.3);
+            margin-right: 10px;
+        }
+
+        .today-events .event-item .event-tag {
+            display: inline-block;
+            font-size: 11px;
+            padding: 1px 10px;
+            background: rgba(160, 130, 255, 0.2);
+            color: #c4b8ff;
+            border-radius: 12px;
+            margin-left: 10px;
+            letter-spacing: 0.5px;
+        }
+
+        .today-events .no-event {
+            color: rgba(255, 255, 255, 0.25);
+            font-size: 14px;
+            padding: 12px 0;
+            font-style: italic;
+        }
+
+        .upcoming-card {
+            flex: 1;
+        }
+
+        .upcoming-card .holiday-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border-left: 3px solid rgba(255, 200, 100, 0.5);
+            margin-bottom: 8px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+
+        .upcoming-card .holiday-item .holiday-name {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 15px;
+            font-weight: 450;
+        }
+
+        .upcoming-card .holiday-item .holiday-date {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 13px;
+            font-weight: 400;
+        }
+
+        .upcoming-card .holiday-item .holiday-type {
+            font-size: 11px;
+            padding: 2px 12px;
+            background: rgba(255, 200, 100, 0.15);
+            color: #fcd34d;
+            border-radius: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .upcoming-card .no-holiday {
+            color: rgba(255, 255, 255, 0.25);
+            font-size: 14px;
+            padding: 12px 0;
+            font-style: italic;
+        }
+
+        .gaokao-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .gaokao-section .gaokao-label {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 13px;
+            letter-spacing: 1px;
+        }
+
+        .gaokao-section .gaokao-count {
+            font-size: 28px;
+            font-weight: 700;
+            color: #fcd34d;
+            text-shadow: 0 0 30px rgba(252, 211, 77, 0.15);
+            letter-spacing: 1px;
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+        }
+
+        .gaokao-section .gaokao-count small {
+            font-size: 15px;
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.3);
+            margin-left: 4px;
+        }
+
+        /* ========== 响应式 ========== */
+        @media (max-width: 1024px) {
+            .container {
+                flex-direction: column;
+                min-height: auto;
+                gap: 24px;
+            }
+            .calendar-section {
+                flex: none;
+                min-width: 0;
+                width: 100%;
+            }
+            .calendar-card {
+                padding: 24px 20px 20px;
+            }
+            .right-section {
+                flex-direction: row;
+                flex-wrap: wrap;
+                min-width: 0;
+            }
+            .right-section .right-card {
+                flex: 1 1 240px;
+                min-height: 180px;
+            }
+            .right-card {
+                padding: 22px 20px 18px;
+            }
+            .day-cell {
+                min-height: 62px;
+            }
+            .event-row {
+                height: 8px;
+                font-size: 6px;
+                line-height: 8px;
+            }
+            .event-rows {
+                min-height: 36px;
+                gap: 1px;
+            }
+            .day-number {
+                font-size: 12px;
+                padding: 0 4px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 12px;
+            }
+            .container {
+                gap: 16px;
+            }
+            .calendar-card {
+                padding: 18px 14px 16px;
+            }
+            .calendar-header .month-year {
+                font-size: 18px;
+            }
+            .weekdays span {
+                font-size: 11px;
+            }
+            .day-cell {
+                min-height: 54px;
+            }
+            .event-row {
+                height: 7px;
+                font-size: 5px;
+                line-height: 7px;
+                padding: 0 2px;
+            }
+            .event-rows {
+                min-height: 30px;
+                gap: 1px;
+            }
+            .day-number {
+                font-size: 11px;
+                padding: 0 4px;
+                line-height: 1.6;
+            }
+            .right-section {
+                flex-direction: column;
+            }
+            .right-section .right-card {
+                flex: none;
+                min-height: auto;
+            }
+            .right-card {
+                padding: 18px 16px 16px;
+            }
+            .gaokao-section .gaokao-count {
+                font-size: 22px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 页面结构 -->
+    <div class="container">
+        <section class="calendar-section">
+            <div class="calendar-card glass">
+                <div class="calendar-header">
+                    <span class="month-year" id="monthYear">加载中...</span>
+                    <div class="nav-group">
+                        <button class="nav-btn" id="prevMonth">‹</button>
+                        <button class="nav-btn" id="nextMonth">›</button>
+                    </div>
+                </div>
+                <div class="weekdays">
+                    <span>一</span><span>二</span><span>三</span>
+                    <span>四</span><span>五</span><span>六</span>
+                    <span>日</span>
+                </div>
+                <div class="days-grid" id="daysGrid"></div>
+            </div>
+        </section>
+
+        <section class="right-section">
+            <div class="right-card glass today-events">
+                <div class="card-title"><span class="icon">📌</span> 今日事件</div>
+                <div class="event-list" id="todayEvents"></div>
+            </div>
+            <div class="right-card glass upcoming-card">
+                <div class="card-title"><span class="icon">🎯</span> 最近放假 · 活动</div>
+                <div id="upcomingHoliday"></div>
+                <div class="gaokao-section">
+                    <span class="gaokao-label">距离 2029 年高考</span>
+                    <span class="gaokao-count">
+                        <span id="gaokaoDays">--</span><small>天</small>
+                    </span>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // ============================================================
+        //  配置
+        // ============================================================
+        const API_BASE = 'https://jzr2011.serv00.net/schedule';
+        const API_URL = API_BASE + '/events.php';
+
+        // ============================================================
+        //  全局状态
+        // ============================================================
+        let currentYear = new Date().getFullYear();
+        let currentMonth = new Date().getMonth();
+        let eventsMap = {};
+
+        const TYPE_ROW_MAP = {
+            '放假': 0,
+            '活动': 1,
+            '考试': 2,
+            '补课': 3
+        };
+        const TYPE_CLASS_MAP = {
+            '放假': 'type-holiday',
+            '活动': 'type-activity',
+            '考试': 'type-exam',
+            '补课': 'type-custom'
+        };
+
+        // ============================================================
+        //  工具函数
+        // ============================================================
+        function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+        function formatDateKey(year, month, day) {
+            return year + '-' + pad(month + 1) + '-' + pad(day);
+        }
+
+        function parseDateKey(key) {
+            const parts = key.split('-').map(Number);
+            return { year: parts[0], month: parts[1] - 1, day: parts[2] };
+        }
+
+        function daysInMonth(year, month) {
+            return new Date(year, month + 1, 0).getDate();
+        }
+
+        function firstDayOfMonth(year, month) {
+            return new Date(year, month, 1).getDay();
+        }
+
+        function getToday() {
+            const now = new Date();
+            return { year: now.getFullYear(), month: now.getMonth(), day: now.getDate() };
+        }
+
+        function getPreviousDayKey(year, month, day) {
+            const date = new Date(year, month, day);
+            date.setDate(date.getDate() - 1);
+            return formatDateKey(date.getFullYear(), date.getMonth(), date.getDate());
+        }
+
+        // ============================================================
+        //  数据获取
+        // ============================================================
+        async function fetchEvents(year) {
+            const url = `${API_URL}?year=${year}`;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('网络响应错误');
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.warn('无法连接后端，使用本地备用数据', error);
+                return getFallbackEvents();
+            }
+        }
+
+        function getFallbackEvents() {
+            return [
+                { start_date: '2026-01-01', end_date: '2026-01-01', name: '元旦', type: '放假' },
+                { start_date: '2026-02-17', end_date: '2026-02-18', name: '春节', type: '放假' },
+                { start_date: '2026-05-01', end_date: '2026-05-01', name: '劳动节', type: '放假' },
+                { start_date: '2026-07-01', end_date: '2026-08-31', name: '暑假', type: '放假' },
+                { start_date: '2026-10-01', end_date: '2026-10-07', name: '国庆节', type: '放假' },
+                { start_date: '2026-06-19', end_date: '2026-06-21', name: '端午节', type: '放假' },
+                { start_date: '2026-01-15', end_date: '2026-01-15', name: '期末考试', type: '考试' },
+                { start_date: '2026-03-20', end_date: '2026-03-21', name: '学校补课', type: '补课' },
+                { start_date: '2026-04-10', end_date: '2026-04-10', name: '运动会', type: '活动' },
+            ];
+        }
+
+        function buildEventsMap(events) {
+            const map = {};
+            events.forEach(ev => {
+                const start = new Date(ev.start_date);
+                const end = new Date(ev.end_date);
+                const cur = new Date(start);
+                while (cur <= end) {
+                    const year = cur.getFullYear();
+                    const month = cur.getMonth();
+                    const day = cur.getDate();
+                    const key = formatDateKey(year, month, day);
+                    if (!map[key]) map[key] = [];
+                    map[key].push({
+                        name: ev.name,
+                        type: ev.type,
+                        start: ev.start_date,
+                        end: ev.end_date
+                    });
+                    cur.setDate(cur.getDate() + 1);
+                }
+            });
+            return map;
+        }
+
+        // ============================================================
+        //  渲染日历
+        // ============================================================
+        function renderCalendar(year, month) {
+            const today = getToday();
+            const firstDay = firstDayOfMonth(year, month);
+            const days = daysInMonth(year, month);
+            const startOffset = (firstDay === 0) ? 6 : firstDay - 1;
+
+            document.getElementById('monthYear').textContent = `${year}年 ${month + 1}月`;
+
+            let html = '';
+            const prevMonthDays = daysInMonth(year, month - 1);
+            for (let i = startOffset - 1; i >= 0; i--) {
+                const d = prevMonthDays - i;
+                const m = (month - 1 + 12) % 12;
+                const y = month === 0 ? year - 1 : year;
+                const key = formatDateKey(y, m, d);
+                const events = eventsMap[key] || [];
+                html += buildDayCell(y, m, d, events, true);
+            }
+            for (let d = 1; d <= days; d++) {
+                const key = formatDateKey(year, month, d);
+                const events = eventsMap[key] || [];
+                const isToday = (year === today.year && month === today.month && d === today.day);
+                html += buildDayCell(year, month, d, events, false, isToday);
+            }
+            const totalCells = startOffset + days;
+            const remaining = (7 - (totalCells % 7)) % 7;
+            for (let d = 1; d <= remaining; d++) {
+                const m = (month + 1) % 12;
+                const y = month === 11 ? year + 1 : year;
+                const key = formatDateKey(y, m, d);
+                const events = eventsMap[key] || [];
+                html += buildDayCell(y, m, d, events, true);
+            }
+
+            document.getElementById('daysGrid').innerHTML = html;
+        }
+
+        function buildDayCell(year, month, day, events, isOtherMonth, isToday = false) {
+            const currentKey = formatDateKey(year, month, day);
+            const rowsData = [
+                { type: '放假', events: [] },
+                { type: '活动', events: [] },
+                { type: '考试', events: [] },
+                { type: '补课', events: [] }
+            ];
+
+            events.forEach(ev => {
+                const rowIdx = TYPE_ROW_MAP[ev.type];
+                if (rowIdx !== undefined) {
+                    rowsData[rowIdx].events.push(ev);
+                }
+            });
+
+            let rowsHtml = '';
+            for (let i = 0; i < 4; i++) {
+                const row = rowsData[i];
+                const type = row.type;
+                const evs = row.events;
+
+                let displayName = '';
+                let hasEvent = false;
+
+                if (evs.length > 0) {
+                    hasEvent = true;
+                    const ev = evs[0];
+                    if (ev.start === currentKey) {
+                        displayName = ev.name;
+                    } else {
+                        displayName = '';
+                    }
+                }
+
+                const typeClass = TYPE_CLASS_MAP[type] || '';
+                const eventClass = hasEvent ? 'has-event ' + typeClass : 'no-event';
+                rowsHtml += `<div class="event-row ${eventClass}" title="${displayName || ''}">${displayName}</div>`;
+            }
+
+            const dateStr = currentKey;
+            const isTodayClass = isToday ? 'today' : '';
+            const otherClass = isOtherMonth ? 'other-month' : '';
+
+            return `
+                        <div class="day-cell ${otherClass} ${isTodayClass}" data-date="${dateStr}">
+                            <div class="event-rows">${rowsHtml}</div>
+                            <div class="day-number">${day}</div>
+                        </div>
+                    `;
+        }
+
+        // ============================================================
+        //  右侧面板
+        // ============================================================
+        function renderTodayEvents() {
+            const today = getToday();
+            const todayKey = formatDateKey(today.year, today.month, today.day);
+            const events = eventsMap[todayKey] || [];
+            const container = document.getElementById('todayEvents');
+
+            if (events.length === 0) {
+                container.innerHTML = `<div class="no-event">今天没有特殊事件</div>`;
+                return;
+            }
+
+            const order = { '放假': 1, '考试': 2, '活动': 3, '补课': 4 };
+            events.sort((a, b) => (order[a.type] || 99) - (order[b.type] || 99));
+
+            const dateStr = `${today.year}年${today.month+1}月${today.day}日`;
+            let html = '';
+            events.forEach(e => {
+                const tagMap = { '放假': '放假', '考试': '考试', '活动': '活动', '补课': '补课' };
+                const tag = tagMap[e.type] || e.type;
+                const rangeInfo = (e.start !== e.end) ? ` (${e.start} 至 ${e.end})` : '';
+                html += `
+                            <div class="event-item">
+                                <span class="event-date-label">${dateStr}</span>
+                                <span>${e.name}${rangeInfo}</span>
+                                <span class="event-tag">${tag}</span>
+                            </div>
+                        `;
+            });
+            container.innerHTML = html;
+        }
+
+        function renderUpcomingHoliday() {
+            const today = getToday();
+            const todayKey = formatDateKey(today.year, today.month, today.day);
+
+            const allEvents = [];
+            const seen = new Set();
+            for (const [dateKey, evs] of Object.entries(eventsMap)) {
+                evs.forEach(ev => {
+                    const id = ev.name + ev.start + ev.end;
+                    if (!seen.has(id)) {
+                        seen.add(id);
+                        allEvents.push({
+                            name: ev.name,
+                            type: ev.type,
+                            start: ev.start,
+                            end: ev.end
+                        });
+                    }
+                });
+            }
+
+            const future = allEvents.filter(ev => ev.start >= todayKey);
+            future.sort((a, b) => a.start.localeCompare(b.start));
+
+            const container = document.getElementById('upcomingHoliday');
+            if (future.length === 0) {
+                container.innerHTML = `<div class="no-holiday">暂无未来事件</div>`;
+                return;
+            }
+
+            const nearest = future[0];
+            const parts = parseDateKey(nearest.start);
+            const dateObj = new Date(parts.year, parts.month, parts.day);
+            const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+            const wd = weekdays[dateObj.getDay()];
+            const dateStr = `${parts.year}年${parts.month+1}月${parts.day}日 周${wd}`;
+            const tagMap = { '放假': '放假', '考试': '考试', '活动': '活动', '补课': '补课' };
+            const tag = tagMap[nearest.type] || nearest.type;
+
+            container.innerHTML = `
+                        <div class="holiday-item">
+                            <div>
+                                <span class="holiday-name">${nearest.name}</span>
+                                <span class="holiday-type">${tag}</span>
+                            </div>
+                            <span class="holiday-date">${dateStr}</span>
+                        </div>
+                        ${future.length > 1 ? `<div style="margin-top:6px;font-size:12px;color:rgba(255,255,255,0.2);text-align:right;">还有 ${future.length-1} 个后续事件</div>` : ''}
+                    `;
+        }
+
+        function renderGaokaoCountdown() {
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const target = new Date(2029, 5, 7);
+            const diffTime = target.getTime() - today.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const el = document.getElementById('gaokaoDays');
+            if (diffDays < 0) {
+                el.textContent = '已结束';
+                el.style.color = '#f87171';
+            } else if (diffDays === 0) {
+                el.textContent = '今天！';
+                el.style.color = '#fcd34d';
+            } else {
+                el.textContent = diffDays;
+                el.style.color = '#fcd34d';
+            }
+        }
+
+        // ============================================================
+        //  数据加载与渲染
+        // ============================================================
+        async function loadData(year) {
+            const events = await fetchEvents(year);
+            eventsMap = buildEventsMap(events);
+            renderCalendar(year, currentMonth);
+            renderTodayEvents();
+            renderUpcomingHoliday();
+            renderGaokaoCountdown();
+        }
+
+        // ============================================================
+        //  初始化
+        // ============================================================
+        async function init() {
+            await loadData(currentYear);
+
+            document.getElementById('prevMonth').addEventListener('click', () => {
+                let newYear = currentYear;
+                let newMonth = currentMonth;
+                if (currentMonth === 0) {
+                    newMonth = 11;
+                    newYear = currentYear - 1;
+                } else {
+                    newMonth = currentMonth - 1;
+                }
+                if (newYear !== currentYear) {
+                    currentYear = newYear;
+                    currentMonth = newMonth;
+                    loadData(currentYear);
+                } else {
+                    currentMonth = newMonth;
+                    renderCalendar(currentYear, currentMonth);
+                }
+            });
+
+            document.getElementById('nextMonth').addEventListener('click', () => {
+                let newYear = currentYear;
+                let newMonth = currentMonth;
+                if (currentMonth === 11) {
+                    newMonth = 0;
+                    newYear = currentYear + 1;
+                } else {
+                    newMonth = currentMonth + 1;
+                }
+                if (newYear !== currentYear) {
+                    currentYear = newYear;
+                    currentMonth = newMonth;
+                    loadData(currentYear);
+                } else {
+                    currentMonth = newMonth;
+                    renderCalendar(currentYear, currentMonth);
+                }
+            });
+
+            setInterval(renderGaokaoCountdown, 60000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
